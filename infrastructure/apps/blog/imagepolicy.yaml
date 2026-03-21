@@ -6,6 +6,8 @@ metadata:
 spec:
   imageRepositoryRef:
     name: blog
+  filterTags:
+    pattern: "^[0-9a-f]{7}$"
   policy:
-    semver:
-      range: ">=0.0.1"
+    alphabetical:
+      order: asc

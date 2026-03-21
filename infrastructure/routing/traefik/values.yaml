@@ -1,6 +1,10 @@
 hostNetwork: true
 dnsPolicy: ClusterFirstWithHostNet
 
+deployment:
+  strategy:
+    type: Recreate
+
 ports:
   web:
     expose:
