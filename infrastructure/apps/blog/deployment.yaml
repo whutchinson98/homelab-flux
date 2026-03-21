@@ -17,7 +17,7 @@ spec:
         - name: ghcr-auth
       containers:
         - name: blog
-          image: ghcr.io/whutchinson98/blog:481823a # {"$imagepolicy": "apps:blog"}
+          image: ghcr.io/whutchinson98/blog:ae59ca5 # {"$imagepolicy": "apps:blog"}
           ports:
             - containerPort: 80
           resources:
