@@ -4,6 +4,11 @@ grafana:
     enabled: false
   adminUser: admin
   adminPassword: "" # Overridden by SOPS secret
+  persistence:
+    enabled: true
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
 
 prometheus:
   prometheusSpec:
