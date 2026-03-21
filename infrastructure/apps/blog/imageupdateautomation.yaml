@@ -1,0 +1,25 @@
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageUpdateAutomation
+metadata:
+  name: blog
+  namespace: apps
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        email: fluxcdbot@users.noreply.github.com
+        name: fluxcd
+      messageTemplate: "chore: update blog image to {{range .Updated.Images}}{{.}}{{end}}"
+    push:
+      branch: main
+  update:
+    path: ./infrastructure/apps/blog
+    strategy: Setters

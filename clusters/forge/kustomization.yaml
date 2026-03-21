@@ -7,3 +7,4 @@ resources:
   - infrastructure/routing
   - infrastructure/monitoring
   - infrastructure/monitoring-config
+  - infrastructure/apps
