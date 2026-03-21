@@ -1,0 +1,19 @@
+grafana:
+  enabled: true
+  ingress:
+    enabled: false
+  adminUser: admin
+  adminPassword: "" # Overridden by SOPS secret
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi

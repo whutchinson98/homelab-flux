@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  entryPoints:
+    - wss-internal
+  routes:
+    - match: Host(`prometheus.thehutchery.com`)
+      kind: Rule
+      services:
+        - name: kube-prometheus-stack-prometheus
+          port: 9090
+  tls:
+    secretName: prometheus-tls

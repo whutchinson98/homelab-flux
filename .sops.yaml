@@ -1,0 +1,10 @@
+creation_rules:
+  - path_regex: infrastructure/cert-manager/.*\.sops\.yaml$
+    encrypted_regex: "^(data|stringData)$"
+    age: age1xktzf37vtkpcs8zzlpx4qluw5p5d4dyw5jh4zq53vhhjn9p3re8sekav9j
+  - path_regex: infrastructure/routing/.*\.sops\.yaml$
+    encrypted_regex: "^(data|stringData)$"
+    age: age1xktzf37vtkpcs8zzlpx4qluw5p5d4dyw5jh4zq53vhhjn9p3re8sekav9j
+  - path_regex: infrastructure/monitoring/.*\.sops\.yaml$
+    encrypted_regex: "^(data|stringData)$"
+    age: age1xktzf37vtkpcs8zzlpx4qluw5p5d4dyw5jh4zq53vhhjn9p3re8sekav9j

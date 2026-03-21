@@ -1,0 +1,70 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: routing
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/routing
+  prune: true
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: routing-traefik
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: routing
+    - name: cert-manager-config
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/routing/traefik
+  prune: true
+  wait: true
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: routing-traefik-config
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: routing-traefik
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/routing/traefik-config
+  prune: true
+  wait: true
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: routing-cloudflared
+  namespace: flux-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: routing-traefik
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/routing/cloudflared
+  prune: true
+  wait: true
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
