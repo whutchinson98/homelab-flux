@@ -4,7 +4,7 @@ resources:
   - namespace.yaml
   - helmrepository.yaml
   - helmrelease.yaml
-  - grafana-secret.sops.yaml
+  - secret.sops.yaml
 configMapGenerator:
   - name: kube-prometheus-stack-values
     namespace: monitoring
