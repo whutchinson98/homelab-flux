@@ -17,11 +17,4 @@ spec:
         name: testdb-superuser
 
   storage:
-    ephemeralVolumeSource:
-      volumeClaimTemplate:
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
+    size: 1Gi
