@@ -7,7 +7,7 @@ spec:
   imageRepositoryRef:
     name: blog
   filterTags:
-    pattern: "^[0-9a-f]{7}$"
+    pattern: "^\d{14}$"
   policy:
     alphabetical:
       order: asc
