@@ -1,0 +1,20 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: databases-testdb
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure/databases/testdb
+  prune: true
+  wait: true
+  dependsOn:
+    - name: databases
+    - name: cloudnativepg
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

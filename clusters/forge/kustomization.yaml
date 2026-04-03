@@ -8,3 +8,5 @@ resources:
   - infrastructure/monitoring
   - infrastructure/monitoring-config
   - infrastructure/apps
+  - infrastructure/cloudnativepg
+  - infrastructure/databases

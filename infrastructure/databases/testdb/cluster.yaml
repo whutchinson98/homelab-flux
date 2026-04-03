@@ -1,0 +1,27 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: testdb
+  namespace: databases
+spec:
+  instances: 1
+
+  superuserSecret:
+    name: testdb-superuser
+
+  bootstrap:
+    initdb:
+      database: testdb
+      owner: testdb
+      secret:
+        name: testdb-superuser
+
+  storage:
+    ephemeralVolumeSource:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
