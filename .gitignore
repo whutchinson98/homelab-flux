@@ -1,0 +1,11 @@
+# Private age keys and local decrypted secrets
+*.agekey
+age.key
+keys.txt
+*.dec.yaml
+*.dec.yml
+secret.yaml
+secrets.yaml
+.env
+.env.*
+!.env.example
