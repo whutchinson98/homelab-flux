@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-tls
+  namespace: monitoring
+spec:
+  secretName: grafana-tls
+  issuerRef:
+    # Validate Cloudflare DNS-01 with staging before issuing a trusted certificate.
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  dnsNames:
+    - grafana.thehutchery.com
