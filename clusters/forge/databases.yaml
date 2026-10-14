@@ -1,0 +1,56 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  path: ./infrastructure/cloudnative-pg/controller
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: whoop-postgres
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 15m
+  dependsOn:
+    - name: cloudnative-pg
+  path: ./infrastructure/databases/whoop
+  # Removing Git manifests must not automatically delete the database or namespace.
+  # Intentional teardown requires a separate, manual deletion after backing up.
+  prune: false
+  deletionPolicy: Orphan
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgres-monitoring
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+    - name: whoop-postgres
+    - name: monitoring
+  path: ./infrastructure/monitoring/postgres
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

@@ -7,3 +7,4 @@ resources:
   - monitoring-certificates.yaml
   - networking.yaml
   - monitoring-routes.yaml
+  - databases.yaml
