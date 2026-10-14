@@ -6,8 +6,7 @@ metadata:
 spec:
   schedule: "0 9 * * *"
   timeZone: America/Toronto
-  # Enable in Git only after migrations, initial authorization and a manual run.
-  suspend: true
+  suspend: false
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 3
