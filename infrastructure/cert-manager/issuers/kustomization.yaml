@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Generate this encrypted Secret with scripts/configure-cloudflare.py
+  # before committing the certificate configuration.
+  - cloudflare-api-token.sops.yaml
+  - letsencrypt-staging.yaml
+  - letsencrypt-prod.yaml
