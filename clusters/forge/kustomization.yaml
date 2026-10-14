@@ -12,3 +12,4 @@ resources:
   - whoop-secrets.yaml
   - whoop-scraper.yaml
   - whoop-grafana.yaml
+  - habit-tracker.yaml

@@ -1,0 +1,121 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-postgres
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: cloudnative-pg
+  path: ./infrastructure/databases/habit-tracker
+  prune: false
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  deletionPolicy: Orphan
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-tracker-secrets
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: doppler-operator
+  - name: habit-postgres
+  path: ./apps/habit-tracker/secrets
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  healthCheckExprs:
+  - apiVersion: secrets.doppler.com/v1alpha1
+    kind: DopplerSecret
+    current: status.conditions.exists(c, c.type == 'secrets.doppler.com/SecretSyncReady'
+      && c.status == 'True')
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-tracker-images
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: habit-tracker-secrets
+  path: ./apps/habit-tracker/images
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-tracker-certificate
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: cert-manager-issuers
+  - name: habit-postgres
+  path: ./apps/habit-tracker/certificate
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-tracker
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: habit-postgres
+  - name: habit-tracker-secrets
+  - name: habit-tracker-certificate
+  - name: routing-traefik
+  path: ./apps/habit-tracker/app
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: habit-postgres-monitoring
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+  - name: habit-postgres
+  - name: monitoring
+  path: ./infrastructure/monitoring/habit-postgres
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

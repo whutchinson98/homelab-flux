@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: habit-postgres
+  namespace: habit-tracker
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
+  enableSuperuserAccess: false
+  certificates:
+    serverAltDNSNames:
+    - localhost
+  bootstrap:
+    initdb:
+      database: habits
+      owner: habit
+      secret:
+        name: habit-postgres-credentials
+  postgresql:
+    parameters:
+      max_connections: '50'
+      shared_buffers: 128MB
+    pg_hba:
+    - hostnossl all all all reject
+  storage:
+    storageClass: local-path
+    size: 10Gi
+  affinity:
+    nodeSelector:
+      kubernetes.io/hostname: forge
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  monitoring:
+    tls:
+      enabled: true

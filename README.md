@@ -1,6 +1,6 @@
 # homelab-flux
 
-GitOps configuration for **forge**, a single-node k3s homelab. Flux reconciles this repository into the cluster. Monitoring is private over Tailscale; WHOOP data is collected daily into PostgreSQL and visualized in Grafana.
+GitOps configuration for **forge**, a single-node k3s homelab. Flux reconciles this repository into the cluster. Monitoring and Habit Tracker are private over Tailscale. WHOOP data is collected daily into PostgreSQL and visualized in Grafana; Habit Tracker uses its own namespace and PostgreSQL instance.
 
 This README describes the configuration in Git. Host installation, Tailscale enrollment, Cloudflare application DNS records, and database contents are managed outside this repository.
 
@@ -27,6 +27,7 @@ Connect to Tailscale before opening these URLs.
 | --- | --- |
 | Grafana | [grafana.thehutchery.com](https://grafana.thehutchery.com) |
 | WHOOP dashboard | [WHOOP Overview](https://grafana.thehutchery.com/d/whoop-overview/whoop-overview) |
+| Habit Tracker | [habits.thehutchery.com](https://habits.thehutchery.com) |
 | Prometheus | [prometheus.thehutchery.com](https://prometheus.thehutchery.com) |
 | Traefik dashboard | [traefik.thehutchery.com/dashboard/](https://traefik.thehutchery.com/dashboard/) |
 
@@ -51,6 +52,10 @@ flowchart LR
     Client["Tailscale client"] -->|"HTTPS to 100.84.41.55:443"| Traefik["Traefik"]
     Traefik --> Grafana
     Traefik --> Prom
+    Traefik --> Habits["Habit Tracker"]
+    Habits --> HabitDB["CNPG: habit-postgres"]
+    Registry["GHCR latest digest"] --> Images["Flux image controllers"]
+    Images -->|"commit pinned digest"| Git
 ```
 
 ### Repository layout
@@ -73,6 +78,7 @@ infrastructure/
 apps/whoop-scraper/
   secrets/                        Doppler token and environment/registry sync
   app/                            Scheduled scraper workload
+apps/habit-tracker/                Private app, migration init container, image updates, secrets and certificate
 scripts/                          Local setup and database helpers
 .sops.yaml                        Encryption rules and public age recipient
 ```
@@ -98,6 +104,12 @@ The root `flux-system` Kustomization applies the child Flux Kustomizations. Thei
 | `whoop-secrets` | `doppler-operator`, `whoop-postgres` |
 | `whoop-scraper` | `whoop-secrets`, `whoop-postgres` |
 | `whoop-grafana` | `monitoring`, `whoop-postgres`, `whoop-secrets` |
+| `habit-postgres` | `cloudnative-pg` |
+| `habit-tracker-secrets` | `doppler-operator`, `habit-postgres` |
+| `habit-tracker-images` | `habit-tracker-secrets` |
+| `habit-tracker-certificate` | `cert-manager-issuers`, `habit-postgres` |
+| `habit-tracker` | `habit-postgres`, `habit-tracker-secrets`, `habit-tracker-certificate`, `routing-traefik` |
+| `habit-postgres-monitoring` | `habit-postgres`, `monitoring` |
 
 Flux checks Git every **minute**. Kustomizations also reconcile every **10 minutes**, and new source revisions trigger reconciliation automatically. Manual reconcile commands accelerate that process; they are not required for every push. Helm chart versions are pinned in each `HelmRelease`.
 
@@ -105,7 +117,7 @@ Most resources are pruned when removed from Git. The database Kustomization deli
 
 ## Networking and certificates
 
-Cloudflare has manually maintained, **DNS-only** A records for `grafana`, `prometheus`, and `traefik`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
+Cloudflare has manually maintained, **DNS-only** A records for `grafana`, `prometheus`, `traefik`, and `habits`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
 
 Traefik uses host networking on `forge` and listens for application HTTPS only on `100.84.41.55:443`. The default web/websecure listeners, LoadBalancer Service and NodePorts are disabled. Its internal health/admin entry point binds to loopback. Routes use the `tailscale` entry point and ingress class annotation.
 
@@ -134,7 +146,7 @@ Commit the resulting encrypted file. Never commit the private age key, decrypted
 
 ### Doppler
 
-The operator reads project **`whoop-scraper`**, config **`prd`**, using the SOPS-protected service token. It syncs every **60 seconds**.
+The operator reads **`whoop-scraper/prd`** and **`habit-tracker/prd`**, each using its own SOPS-protected read-only service token. It syncs every **60 seconds**.
 
 | Doppler keys | Kubernetes Secret | Consumer |
 | --- | --- | --- |
@@ -158,6 +170,7 @@ Local helpers that publish values need a Doppler CLI login with **write access**
 | Grafana | 1 GiB | Persistent Grafana state |
 | Alertmanager | 1 GiB | Persistent Alertmanager state |
 | WHOOP PostgreSQL | 10 GiB | No application retention policy configured here |
+| Habit Tracker PostgreSQL | 10 GiB | Habit and completion history |
 
 These volumes depend on the node's disk. `local-path` does not enforce the requested capacities or support online volume expansion in this setup. There is one database instance, no database HA, and no off-node backup configured in this repository.
 
@@ -180,6 +193,38 @@ Grafana uses a dedicated `whoop_grafana` login with SELECT access to only:
 It cannot read the token/source tables or write application data. The [reader grants](scripts/whoop-grafana-reader.sql) are applied by the local setup helper, rather than by Flux.
 
 The [WHOOP dashboard JSON](infrastructure/monitoring/whoop/whoop-overview.json) is provisioned from a labeled ConfigMap; edit it in Git for persistent changes. It refreshes every five minutes and defaults to a 30-day display window. Cycle metrics remain per physiological cycle, missing values remain gaps, and weight uses its actual observation time. Quality panels identify incomplete cycles. Refreshing Grafana does not trigger a scrape or import older history.
+
+## Habit Tracker and automatic image updates
+
+[Habit Tracker](https://github.com/whutchinson98/habit-tracker) runs in namespace `habit-tracker`, with database `habits` owned by `habit` on CNPG cluster `habit-postgres`. The database has one instance on `forge`, local-path storage, verified TLS and no public database Service. Its Flux Kustomization preserves resources on removal, just like WHOOP's database. Credentials are encrypted in [credentials.sops.yaml](infrastructure/databases/habit-tracker/credentials.sops.yaml).
+
+Doppler `habit-tracker/prd` supplies `DATABASE_URL` and `APP_TIMEZONE=America/Toronto` to `habit-tracker-env`, and `GHCR_DOCKERCONFIG` to `ghcr-auth`. The registry credential is available to both pod pulls and Flux's image reflector. The app has no login; anyone permitted to reach its HTTPS listener through the tailnet can use it.
+
+Flux's image-reflector and image-automation controllers are included in the generated bootstrap manifest. The [image policy](apps/habit-tracker/images/policy.yaml) selects only `latest` and checks its digest every minute. The automation checks every five minutes and commits digest changes to `main` using the existing writable Flux deploy key. SHA tags are not sorted chronologically; the digest of tested `latest` is the update signal.
+
+One digest setter in [app/kustomization.yaml](apps/habit-tracker/app/kustomization.yaml) pins both the migration init container and app. A single-replica `Recreate` deployment stops the old pod, runs `bun src/server/db/migrate.ts`, and starts the new app only after migrations succeed. This initializes a fresh database and runs pending migrations on later rollouts. Expect brief downtime during updates. Do not scale this deployment above one replica or run migrations concurrently. Application rollback does not roll back database migrations.
+
+The connection uses `sslmode=verify-full` and `NODE_EXTRA_CA_CERTS=/etc/postgresql/ca/ca.crt`. Only the public CA certificate is mounted. Startup/liveness checks use `/api/health/live`; readiness checks PostgreSQL through `/api/health/ready`.
+
+After pushing these manifests, Flux can bring up the dependency chain automatically. To follow the initial deployment explicitly:
+
+```bash
+flux reconcile kustomization flux-system --with-source
+kubectl -n flux-system rollout status deployment/image-reflector-controller --timeout=5m
+kubectl -n flux-system rollout status deployment/image-automation-controller --timeout=5m
+flux reconcile kustomization habit-postgres --with-source
+flux reconcile kustomization habit-tracker-secrets --with-source
+flux reconcile kustomization habit-tracker-certificate --with-source
+flux reconcile kustomization habit-tracker-images --with-source
+flux reconcile kustomization habit-tracker --with-source
+kubectl -n habit-tracker rollout status deployment/habit-tracker --timeout=10m
+kubectl -n habit-tracker logs deployment/habit-tracker -c migrate
+flux get images all -n habit-tracker
+```
+
+For a migration failure, inspect init-container logs and fix the migration before retrying; do not bypass initialization. For image update failures, inspect `flux logs --kind=ImageUpdateAutomation --name=habit-tracker --namespace=habit-tracker --level=error`. Flux needs a deploy key allowed to write to this repository and a `main` branch policy that permits its commits.
+
+To hold a particular version, set `spec.suspend: true` on the [ImageUpdateAutomation](apps/habit-tracker/images/automation.yaml), pin the desired digest, and push both changes together. For normal manual Git changes, pull before editing/pushing because Flux also commits to `main`.
 
 ## Common operations
 
@@ -295,6 +340,7 @@ The Flux bootstrap target is:
 flux bootstrap git \
   --url=ssh://git@github.com/whutchinson98/homelab-flux.git \
   --branch=main \
+  --components-extra=image-reflector-controller,image-automation-controller \
   --path=clusters/forge
 ```
 

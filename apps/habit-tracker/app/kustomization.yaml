@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingressroute.yaml
+images:
+  # One digest controls both the migration init container and the application.
+  - name: ghcr.io/whutchinson98/habit-tracker
+    newTag: latest
+    digest: sha256:48d480bc17dd8ab8b4cbbec9f8de1af9f72e33a74b34c67b3fec63d3e07aff53 # {"$imagepolicy": "habit-tracker:habit-tracker:digest"}

@@ -1,0 +1,25 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: habit-tracker
+  namespace: habit-tracker
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcd
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: 'chore: update habit-tracker image digest'
+    push:
+      branch: main
+  update:
+    path: ./apps/habit-tracker/app
+    strategy: Setters

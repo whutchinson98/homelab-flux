@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: habit-tracker
+  namespace: habit-tracker
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: habit-tracker
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http

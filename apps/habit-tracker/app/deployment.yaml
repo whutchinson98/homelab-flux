@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: habit-tracker
+  namespace: habit-tracker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: habit-tracker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: habit-tracker
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      imagePullSecrets:
+      - name: ghcr-auth
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - image: ghcr.io/whutchinson98/habit-tracker:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: habit-tracker-env
+              key: DATABASE_URL
+        - name: APP_TIMEZONE
+          valueFrom:
+            secretKeyRef:
+              name: habit-tracker-env
+              key: APP_TIMEZONE
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/postgresql/ca/ca.crt
+        - name: PORT
+          value: '3000'
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: postgres-ca
+          mountPath: /etc/postgresql/ca
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        name: migrate
+        command:
+        - bun
+        - src/server/db/migrate.ts
+      containers:
+      - image: ghcr.io/whutchinson98/habit-tracker:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: habit-tracker-env
+              key: DATABASE_URL
+        - name: APP_TIMEZONE
+          valueFrom:
+            secretKeyRef:
+              name: habit-tracker-env
+              key: APP_TIMEZONE
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/postgresql/ca/ca.crt
+        - name: PORT
+          value: '3000'
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: postgres-ca
+          mountPath: /etc/postgresql/ca
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        name: habit-tracker
+        ports:
+        - name: http
+          containerPort: 3000
+        startupProbe:
+          httpGet:
+            path: /api/health/live
+            port: http
+          periodSeconds: 5
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /api/health/live
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/health/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 6
+      volumes:
+      - name: postgres-ca
+        secret:
+          secretName: habit-postgres-ca
+          items:
+          - key: ca.crt
+            path: ca.crt
+      - name: tmp
+        emptyDir:
+          sizeLimit: 32Mi
