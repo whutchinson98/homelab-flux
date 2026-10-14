@@ -11,3 +11,4 @@ resources:
   - doppler.yaml
   - whoop-secrets.yaml
   - whoop-scraper.yaml
+  - whoop-grafana.yaml

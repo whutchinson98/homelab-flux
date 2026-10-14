@@ -1,0 +1,27 @@
+# Run scripts/configure-whoop-grafana.py before deploying this resource.
+# The operator namespace permits referencing the existing token in whoop and
+# writing the Grafana provisioning Secret into monitoring.
+apiVersion: secrets.doppler.com/v1alpha1
+kind: DopplerSecret
+metadata:
+  name: whoop-grafana
+  namespace: doppler-operator-system
+spec:
+  tokenSecret:
+    name: whoop-doppler-token
+    namespace: whoop
+  project: whoop-scraper
+  config: prd
+  resyncSeconds: 60
+  secrets:
+    - WHOOP_GRAFANA_DATASOURCE
+  processors:
+    WHOOP_GRAFANA_DATASOURCE:
+      type: plain
+      asName: whoop-postgres.yaml
+  managedSecret:
+    name: grafana-whoop-datasource
+    namespace: monitoring
+    type: Opaque
+    labels:
+      grafana_datasource: "1"

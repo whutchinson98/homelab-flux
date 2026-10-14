@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: whoop-grafana
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+    - name: monitoring
+    - name: whoop-postgres
+    - name: whoop-secrets
+  path: ./infrastructure/monitoring/whoop
+  prune: true
+  wait: true
+  healthCheckExprs:
+    - apiVersion: secrets.doppler.com/v1alpha1
+      kind: DopplerSecret
+      current: >-
+        status.conditions.exists(c,
+          c.type == 'secrets.doppler.com/SecretSyncReady' && c.status == 'True')
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
