@@ -1,0 +1,25 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: routing-traefik
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+    - name: cert-manager-issuers
+  path: ./infrastructure/networking/traefik
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # k3s owns the Deployment; Flux owns its HelmChartConfig overrides.
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: traefik
+      namespace: kube-system
+    - apiVersion: cert-manager.io/v1
+      kind: Certificate
+      name: traefik-dashboard-tls
+      namespace: kube-system

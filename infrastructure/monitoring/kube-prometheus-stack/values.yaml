@@ -18,6 +18,12 @@ defaultRules:
 
 grafana:
   enabled: true
+  grafana.ini:
+    server:
+      domain: grafana.thehutchery.com
+      root_url: https://grafana.thehutchery.com
+    security:
+      cookie_secure: true
   admin:
     existingSecret: grafana-admin-credentials
     userKey: admin-user
@@ -47,6 +53,7 @@ prometheus:
   service:
     type: ClusterIP
   prometheusSpec:
+    externalUrl: https://prometheus.thehutchery.com
     retention: 30d
     # Keep headroom for the WAL and compaction. local-path does not enforce
     # PVC capacity, so retention and node free-space alerts matter too.

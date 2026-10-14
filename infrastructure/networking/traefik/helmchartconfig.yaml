@@ -1,0 +1,80 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  # Overrides the Traefik chart bundled with k3s. Validated against
+  # traefik-40.1.5+up40.1.0 on k3s v1.36.5+k3s1.
+  valuesContent: |-
+    hostNetwork: true
+    nodeSelector:
+      kubernetes.io/hostname: forge
+    deployment:
+      replicas: 1
+      dnsPolicy: ClusterFirstWithHostNet
+      healthchecksHost: 127.0.0.1
+      podAnnotations:
+        prometheus.io/scrape: "false"
+    updateStrategy:
+      type: Recreate
+
+    # The node's Tailscale interface must exist before this listener can bind.
+    # Disable the default web ports so no application listener binds the LAN.
+    ports:
+      web: null
+      websecure: null
+      metrics: null
+      traefik:
+        port: 9000
+        hostIP: 127.0.0.1
+        expose:
+          default: false
+      tailscale:
+        port: 443
+        hostIP: 100.84.41.55
+        protocol: TCP
+        expose:
+          default: false
+        tls:
+          enabled: true
+
+    # Remove k3s's LoadBalancer/NodePorts; HTTPS arrives via the host listener.
+    service:
+      enabled: false
+    ingressClass:
+      enabled: false
+    providers:
+      kubernetesCRD:
+        enabled: true
+        ingressClass: tailscale
+        allowCrossNamespace: false
+      kubernetesIngress:
+        enabled: false
+        publishedService:
+          enabled: false
+      kubernetesGateway:
+        enabled: false
+
+    api:
+      dashboard: true
+      insecure: false
+    ingressRoute:
+      dashboard:
+        enabled: false
+    metrics:
+      prometheus: null
+
+    # Keep the chart's non-root user, adding only the low-port bind capability.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+      readOnlyRootFilesystem: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi

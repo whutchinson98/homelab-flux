@@ -5,3 +5,5 @@ resources:
   - monitoring.yaml
   - cert-manager.yaml
   - monitoring-certificates.yaml
+  - networking.yaml
+  - monitoring-routes.yaml

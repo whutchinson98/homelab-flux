@@ -6,8 +6,7 @@ metadata:
 spec:
   secretName: grafana-tls
   issuerRef:
-    # Validate Cloudflare DNS-01 with staging before issuing a trusted certificate.
-    name: letsencrypt-staging
+    name: letsencrypt-prod
     kind: ClusterIssuer
   dnsNames:
     - grafana.thehutchery.com
