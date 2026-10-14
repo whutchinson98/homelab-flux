@@ -10,3 +10,4 @@ resources:
   - databases.yaml
   - doppler.yaml
   - whoop-secrets.yaml
+  - whoop-scraper.yaml

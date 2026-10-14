@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: whoop-scraper
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+    - name: whoop-secrets
+    - name: whoop-postgres
+  path: ./apps/whoop-scraper/app
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

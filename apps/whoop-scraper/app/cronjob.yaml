@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: whoop-scraper
+  namespace: whoop
+spec:
+  schedule: "0 9 * * *"
+  timeZone: America/Toronto
+  # Enable in Git only after migrations, initial authorization and a manual run.
+  suspend: true
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Do not blindly retry an ambiguous WHOOP OAuth token rotation.
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: whoop-scraper
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          nodeSelector:
+            kubernetes.io/arch: amd64
+          imagePullSecrets:
+            - name: ghcr-auth
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: whoop-scraper
+              # CI publishes latest only after checks and the image smoke test.
+              image: ghcr.io/whutchinson98/whoop-scraper:latest
+              imagePullPolicy: Always
+              args: [run]
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: whoop-scraper-env
+                      key: DATABASE_URL
+                - name: WHOOP_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: whoop-scraper-env
+                      key: WHOOP_CLIENT_ID
+                - name: WHOOP_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: whoop-scraper-env
+                      key: WHOOP_CLIENT_SECRET
+                - name: WHOOP_TIMEZONE
+                  valueFrom:
+                    secretKeyRef:
+                      name: whoop-scraper-env
+                      key: WHOOP_TIMEZONE
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              volumeMounts:
+                - name: postgres-ca
+                  mountPath: /etc/postgresql/ca
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: postgres-ca
+              secret:
+                secretName: whoop-postgres-ca
+                # Mount only the public CA certificate, never its private key.
+                items:
+                  - key: ca.crt
+                    path: ca.crt
+            - name: tmp
+              emptyDir:
+                sizeLimit: 16Mi
