@@ -8,3 +8,5 @@ resources:
   - networking.yaml
   - monitoring-routes.yaml
   - databases.yaml
+  - doppler.yaml
+  - whoop-secrets.yaml
