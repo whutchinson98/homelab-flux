@@ -8,4 +8,4 @@ images:
   # One digest controls both the migration init container and the application.
   - name: ghcr.io/whutchinson98/habit-tracker
     newTag: latest
-    digest: sha256:48d480bc17dd8ab8b4cbbec9f8de1af9f72e33a74b34c67b3fec63d3e07aff53 # {"$imagepolicy": "habit-tracker:habit-tracker:digest"}
+    digest: sha256:80378f7193037cc70f539111d6593d902312c7e85aebc52adccdc9090df5f94f # {"$imagepolicy": "habit-tracker:habit-tracker:digest"}
