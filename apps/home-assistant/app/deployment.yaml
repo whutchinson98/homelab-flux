@@ -58,7 +58,8 @@ spec:
             capabilities:
               drop: [ALL]
               # The image's s6 init manages runtime directories and service users.
-              add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+              # NET_RAW lets DHCP discovery receive LAN broadcast packets.
+              add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_RAW]
           ports:
             - name: http
               containerPort: 8123

@@ -296,7 +296,7 @@ The `home-assistant-config` PVC requests 10 GiB of `local-path` storage for `/co
 
 The init container seeds `configuration.yaml`, automation/script/scene files and HTTP settings only when absent. Existing user settings are preserved on restarts and updates. Home Assistant 2026.8+ stores HTTP settings in `.storage/http`; bootstrap uses the pinned release's schema and storage methods rather than leaving deprecated HTTP YAML or an unconfirmed configuration trial. Change HTTP settings under **Settings → System → Network** after installation. The files in `app/config` are first-run defaults, not continuously enforced settings. Revalidate `bootstrap.py` against the image when upgrading.
 
-The deployment uses `Recreate` to avoid concurrent writers or host-port conflicts, and allows 60 seconds for shutdown. This is Home Assistant Container, without Supervisor or the OS app/add-on store. Additional services can be deployed separately in Kubernetes. Bluetooth/USB radios and a Matter server are not provisioned by this deployment.
+The deployment uses `Recreate` to avoid concurrent writers or host-port conflicts, and allows 60 seconds for shutdown. `NET_RAW` enables DHCP discovery; the container is not privileged and does not have host network administration rights. This is Home Assistant Container, without Supervisor or the OS app/add-on store. Additional services can be deployed separately in Kubernetes. Bluetooth/USB radios and a Matter server are not provisioned by this deployment; the default Bluetooth integration may log unavailable-adapter errors until explicitly configured or disabled after onboarding.
 
 Validate and inspect it with:
 
