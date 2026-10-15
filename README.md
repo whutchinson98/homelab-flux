@@ -26,6 +26,7 @@ Connect to Tailscale before opening these URLs.
 | Service | URL |
 | --- | --- |
 | Homepage | [home.thehutchery.com](https://home.thehutchery.com) |
+| Home Assistant | [assistant.thehutchery.com](https://assistant.thehutchery.com) |
 | Grafana | [grafana.thehutchery.com](https://grafana.thehutchery.com) |
 | WHOOP dashboard | [WHOOP Overview](https://grafana.thehutchery.com/d/whoop-overview/whoop-overview) |
 | Habit Tracker | [habits.thehutchery.com](https://habits.thehutchery.com) |
@@ -86,6 +87,7 @@ apps/whoop-scraper/
   app/                            Scheduled scraper workload
 apps/habit-tracker/                Private app, migration init container, image updates, secrets and certificate
 apps/homepage/                     Private dashboard, service links, cluster widgets and certificate
+apps/home-assistant/               LAN-connected Home Assistant, persistent configuration and private HTTPS
 scripts/                          Local setup and database helpers
 .sops.yaml                        Encryption rules and public age recipient
 ```
@@ -121,6 +123,9 @@ The root `flux-system` Kustomization applies the child Flux Kustomizations. Thei
 | `habit-postgres-monitoring` | `habit-postgres`, `monitoring` |
 | `homepage-certificate` | `cert-manager-issuers` |
 | `homepage` | `homepage-certificate`, `routing-traefik`, `monitoring`, `habit-postgres` |
+| `home-assistant-storage` | None |
+| `home-assistant-certificate` | `cert-manager-issuers`, `home-assistant-storage` |
+| `home-assistant` | `home-assistant-storage`, `home-assistant-certificate`, `routing-traefik` |
 
 Flux checks Git every **minute**. Kustomizations also reconcile every **10 minutes**, and new source revisions trigger reconciliation automatically. Manual reconcile commands accelerate that process; they are not required for every push. Helm chart versions are pinned in each `HelmRelease`.
 
@@ -128,7 +133,7 @@ Most resources are pruned when removed from Git. The database Kustomization deli
 
 ## Networking and certificates
 
-Cloudflare has manually maintained, **DNS-only** A records for `home`, `grafana`, `prometheus`, `traefik`, and `habits`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
+Cloudflare has manually maintained, **DNS-only** A records for `home`, `assistant`, `grafana`, `prometheus`, `traefik`, and `habits`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
 
 Traefik uses host networking on `forge` and listens for application HTTPS only on `100.84.41.55:443`. The default web/websecure listeners, LoadBalancer Service and NodePorts are disabled. Its internal health/admin entry point binds to loopback. Routes use the `tailscale` entry point and ingress class annotation.
 
@@ -280,6 +285,28 @@ Homepage runs as UID 1000 with dropped capabilities and a read-only configuratio
 Access uses the existing Tailscale-only Traefik listener and a Let's Encrypt certificate. Homepage does not add a login; tailnet access policy controls who can open it. `HOMEPAGE_ALLOWED_HOSTS` validates the hostname, not user identity. Keep this route private. The DNS-only `home` A record is maintained in Cloudflare outside Flux.
 
 Validate edits with `kubectl kustomize apps/homepage/app`, `kubectl kustomize apps/homepage/certificate`, and `kubectl kustomize clusters/forge`. After deployment, check `flux get kustomizations -n flux-system`, `kubectl -n homepage get pods,certificate`, and open the dashboard. `/api/validate` should return `[]`; `/api/widgets/kubernetes` should return live node metrics.
+
+## Home Assistant
+
+[Home Assistant](https://assistant.thehutchery.com) runs as a single Home Assistant Container replica in namespace `home-assistant`, pinned to version `2026.10.1` and its image digest. Complete onboarding at that URL while connected to Tailscale to create the owner account and configure integrations. Homepage includes a service card and availability check.
+
+The pod uses host networking on `forge` for LAN discovery (mDNS/SSDP), with HTTP bound specifically to `192.168.1.20:8123`. Local devices can use `http://192.168.1.20:8123`; the HTTPS hostname uses the existing Tailscale-only Traefik listener and a Let's Encrypt certificate. Only `192.168.1.20/32`, the host-network Traefik source, is trusted for forwarded client addresses. No public port forwarding, exit node, or subnet router is configured. This assumes Orbi's `TheHutcheryIoT` SSID can communicate with the main LAN; actual IoT connectivity still needs confirmation when adding devices.
+
+The `home-assistant-config` PVC requests 10 GiB of `local-path` storage for `/config`, including accounts, integrations, automations, HTTP settings and the default SQLite recorder database. The storage Flux Kustomization uses `prune: false` and `deletionPolicy: Orphan` so removing the app from Git preserves its namespace and PVC. This is not a backup: disk loss or manually deleting the PVC still loses data. Configure Home Assistant backups after onboarding and keep copies off `forge`.
+
+The init container seeds `configuration.yaml`, automation/script/scene files and HTTP settings only when absent. Existing user settings are preserved on restarts and updates. Home Assistant 2026.8+ stores HTTP settings in `.storage/http`; bootstrap uses the pinned release's schema and storage methods rather than leaving deprecated HTTP YAML or an unconfirmed configuration trial. Change HTTP settings under **Settings → System → Network** after installation. The files in `app/config` are first-run defaults, not continuously enforced settings. Revalidate `bootstrap.py` against the image when upgrading.
+
+The deployment uses `Recreate` to avoid concurrent writers or host-port conflicts, and allows 60 seconds for shutdown. This is Home Assistant Container, without Supervisor or the OS app/add-on store. Additional services can be deployed separately in Kubernetes. Bluetooth/USB radios and a Matter server are not provisioned by this deployment.
+
+Validate and inspect it with:
+
+```bash
+kubectl kustomize apps/home-assistant/storage
+kubectl kustomize apps/home-assistant/certificate
+kubectl kustomize apps/home-assistant/app
+kubectl -n home-assistant get pods,pvc,certificate
+kubectl -n home-assistant logs deployment/home-assistant -c home-assistant --tail=50
+```
 
 ## Common operations
 

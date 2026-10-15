@@ -1,0 +1,12 @@
+# Initial configuration only; subsequent changes live on the persistent volume.
+default_config:
+
+homeassistant:
+  name: The Hutchery
+  time_zone: America/Toronto
+  internal_url: http://192.168.1.20:8123
+  external_url: https://assistant.thehutchery.com
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml

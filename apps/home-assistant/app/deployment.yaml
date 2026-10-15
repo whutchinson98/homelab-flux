@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: home-assistant
+  namespace: home-assistant
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: home-assistant
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: home-assistant
+    spec:
+      # mDNS/SSDP discovery needs the node's LAN interface.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: forge
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: bootstrap
+          image: ghcr.io/home-assistant/home-assistant:2026.10.1
+          command: [python3, /bootstrap/bootstrap.py]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+      containers:
+        - name: home-assistant
+          image: ghcr.io/home-assistant/home-assistant:2026.10.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: America/Toronto
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              # The image's s6 init manages runtime directories and service users.
+              add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+          ports:
+            - name: http
+              containerPort: 8123
+              hostPort: 8123
+              hostIP: 192.168.1.20
+          startupProbe:
+            httpGet:
+              path: /manifest.json
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /manifest.json
+              port: http
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /manifest.json
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: home-assistant-config
+        - name: bootstrap
+          configMap:
+            name: home-assistant-bootstrap

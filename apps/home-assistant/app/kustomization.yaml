@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingressroute.yaml
+  - homepage-rbac.yaml
+configMapGenerator:
+  - name: home-assistant-bootstrap
+    namespace: home-assistant
+    files:
+      - bootstrap.py=config/bootstrap.py
+      - configuration.yaml=config/configuration.yaml
+      - http.json=config/http.json
+images:
+  - name: ghcr.io/home-assistant/home-assistant
+    newTag: "2026.10.1"
+    digest: sha256:130241f28d01fa80dfa3b44f7d89781c188d8642ecab9024f079f19f9f82baa0
