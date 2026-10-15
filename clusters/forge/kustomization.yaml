@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - flux-system
   - monitoring.yaml
+  - logging.yaml
   - cert-manager.yaml
   - monitoring-certificates.yaml
   - networking.yaml

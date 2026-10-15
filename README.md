@@ -49,6 +49,9 @@ flowchart LR
     Exporters["Node, Kubernetes and Postgres metrics"] --> Prom["Prometheus"]
     Prom --> Grafana
     Prom --> AM["Alertmanager"]
+    Pods["Container stdout/stderr"] --> Alloy["Alloy on each node"]
+    Alloy --> Loki["Loki: seven-day log retention"]
+    Loki --> Grafana
     Client["Tailscale client"] -->|"HTTPS to 100.84.41.55:443"| Traefik["Traefik"]
     Traefik --> Grafana
     Traefik --> Prom
@@ -70,6 +73,8 @@ infrastructure/
   doppler/                        Doppler Kubernetes operator
   monitoring/
     kube-prometheus-stack/        Prometheus, Grafana, Alertmanager and exporters
+    loki/                         Log storage, retention and Grafana datasource
+    alloy/                        Container log collection and delivery monitoring
     certificates/                 Grafana and Prometheus certificates
     routes/                       Private Grafana and Prometheus routes
     postgres/                     CNPG operator and database PodMonitors
@@ -92,6 +97,8 @@ The root `flux-system` Kustomization applies the child Flux Kustomizations. Thei
 | Flux Kustomization | Direct dependencies |
 | --- | --- |
 | `monitoring` | None |
+| `logging-loki` | `monitoring` |
+| `logging-alloy` | `logging-loki` |
 | `cert-manager` | None |
 | `cert-manager-issuers` | `cert-manager` |
 | `monitoring-certificates` | `cert-manager-issuers`, `monitoring` |
@@ -169,12 +176,37 @@ Local helpers that publish values need a Doppler CLI login with **write access**
 | Prometheus | 50 GiB | 30 days, with a 40 GB size limit |
 | Grafana | 1 GiB | Persistent Grafana state |
 | Alertmanager | 1 GiB | Persistent Alertmanager state |
+| Loki | 20 GiB | 7 days; compactor deletes expired logs asynchronously |
 | WHOOP PostgreSQL | 10 GiB | No application retention policy configured here |
 | Habit Tracker PostgreSQL | 10 GiB | Habit and completion history |
 
 These volumes depend on the node's disk. `local-path` does not enforce the requested capacities or support online volume expansion in this setup. There is one database instance, no database HA, and no off-node backup configured in this repository.
 
 Alert rules are active, but Alertmanager currently routes to a `null` receiver. **Notifications are not delivered yet.** Backup/recovery and an alert destination are the main remaining operational gaps.
+
+### Centralized container logs
+
+Alloy runs as a DaemonSet, discovers pods on its own node, and reads their containerd CRI logs from `/var/log/pods` through a read-only mount. It collects stdout/stderr across namespaces, including init containers and CronJobs. Services do not need OpenTelemetry or a logging SDK. Logs written only to application files, host journald logs, and Kubernetes Events are not collected by this pipeline.
+
+Loki runs as one monolithic instance in `monitoring`, using TSDB/v13 indexes and local filesystem storage. Its PVC holds log chunks, indexes, the ingester WAL, and compactor state. The compactor enforces `168h` retention; deletion is asynchronous. The 20 GiB PVC request is **not a disk quota**, and Loki does not delete logs based on free space. Monitor node disk usage and adjust retention based on actual volume. Data is local to `forge`, with no replication or off-node backup.
+
+Alloy persists file read positions in the node directory `/var/lib/alloy` so normal collector restarts do not reread every file. Delivery uses in-memory batching and bounded retries; this is not a guarantee of lossless delivery through collector crashes or prolonged Loki outages. `AlloyLogDeliveryFailed` detects entries discarded after retries, and `AlloyLogCollectorDown` detects an unavailable collector. Both components have ServiceMonitors; Loki also installs its chart's recording and alert rules. Alert notifications still require configuring an Alertmanager receiver.
+
+Loki and Alloy have ClusterIP services without ingress. Loki's ingress NetworkPolicy permits only Alloy, Grafana, Prometheus, and Loki pods in `monitoring`; users query through Grafana's existing login. Alloy runs as root with all capabilities dropped to read node-owned logs, and its Kubernetes RBAC grants only pod discovery, without Secret access.
+
+Open [Grafana Explore](https://grafana.thehutchery.com/explore), select **Loki**, and choose a time range. Example queries:
+
+```logql
+{cluster="forge", namespace="whoop", service_name="whoop-scraper"}
+{namespace="habit-tracker"} |~ "(?i)error|warn"
+{namespace="whoop"} | pod="whoop-scraper-example-pod"
+```
+
+Indexed labels are `cluster`, `namespace`, `service_name`, `container`, `node`, and CRI `stream`. `service_name` uses `app.kubernetes.io/name`, then `app`, then the container name. Pod names are stored as structured metadata: filter them after `|`, rather than inside `{...}`. JSON application logs can be parsed with `| json`; plain text remains searchable. Do not log credentials or tokens; this pipeline preserves application log contents.
+
+Once Loki has ingested a log, deleting its Pod or Job does not remove the stored copy. Logs from pods deleted before collection cannot be recovered. Allow short-lived Jobs time to be discovered and ingested before deleting them.
+
+Logging configuration is in `infrastructure/monitoring/loki/values.yaml` and `infrastructure/monitoring/alloy/config.alloy`. Flux deploys Loki after monitoring and Alloy after Loki. Chart versions are pinned, and the Grafana datasource is provisioned by its existing sidecar. Loki PVCs are retained when its StatefulSet is deleted or scaled down; deliberately deleting a PVC can still destroy log data.
 
 ## WHOOP data pipeline
 
@@ -329,6 +361,8 @@ Rerun the Grafana helper after restoring the database or replacing its CA. It re
 | Doppler values are not syncing | `kubectl get dopplersecrets -A`; describe the affected resource and inspect its conditions. |
 | `ImagePullBackOff` | Describe the scraper pod; check `whoop/ghcr-auth` exists and the GHCR token can read the private package. |
 | WHOOP dashboard has no data | Check the selected account/time range, recent scraper Job logs, and the WHOOP PostgreSQL datasource in Grafana. |
+| Grafana Explore has no logs | Select Loki and widen the time range; check `flux get kustomizations -A`, `kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy`, and `kubectl -n monitoring logs statefulset/loki --tail=80`. |
+| Alloy cannot deliver logs | Check `kubectl -n monitoring logs daemonset/alloy -c alloy --tail=80`, Loki readiness, node disk space, and `AlloyLogDeliveryFailed` in Prometheus. |
 
 ## Bootstrap and recovery boundaries
 

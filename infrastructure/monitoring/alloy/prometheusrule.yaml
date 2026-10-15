@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alloy-logs
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: alloy-logs
+      rules:
+        - alert: AlloyLogDeliveryFailed
+          expr: sum by (namespace, pod) (increase(loki_write_dropped_entries_total{namespace="monitoring"}[10m])) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: Alloy is dropping logs after delivery retries
+            description: "Check Alloy and Loki health, ingestion limits, and node disk space. Some container logs were not delivered to Loki."
+        - alert: AlloyLogCollectorDown
+          expr: up{namespace="monitoring", service="alloy"} == 0 or absent(up{namespace="monitoring", service="alloy"})
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Alloy log collector is unavailable
+            description: "Prometheus cannot scrape Alloy. Check the monitoring/alloy DaemonSet and its configuration."

@@ -1,0 +1,70 @@
+fullnameOverride: alloy
+crds:
+  create: false
+
+alloy:
+  enableReporting: false
+  configMap:
+    create: false
+    name: alloy-config
+    key: config.alloy
+  storagePath: /var/lib/alloy
+  mounts:
+    extra:
+      - name: pod-logs
+        mountPath: /var/log/pods
+        readOnly: true
+      - name: alloy-data
+        mountPath: /var/lib/alloy
+  # Root can read node-owned container logs; no privileged mode is needed.
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# Discovery only needs pod metadata, not Secrets or access to pod exec/log APIs.
+rbac:
+  create: false
+
+controller:
+  type: daemonset
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  volumes:
+    extra:
+      - name: pod-logs
+        hostPath:
+          path: /var/log/pods
+          type: Directory
+      - name: alloy-data
+        hostPath:
+          path: /var/lib/alloy
+          type: DirectoryOrCreate
+
+configReloader:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: kube-prometheus-stack
