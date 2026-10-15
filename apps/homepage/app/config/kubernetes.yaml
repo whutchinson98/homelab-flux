@@ -1,0 +1,5 @@
+mode: cluster
+# Cards are explicitly managed in services.yaml, avoiding discovery permissions.
+ingress: false
+traefik: false
+gateway: false

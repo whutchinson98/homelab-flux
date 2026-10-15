@@ -1,0 +1,36 @@
+- Everyday:
+    - Habit Tracker:
+        icon: mdi-calendar-check
+        href: https://habits.thehutchery.com
+        description: Small habits, steady progress.
+        namespace: habit-tracker
+        app: habit-tracker
+        siteMonitor: http://habit-tracker.habit-tracker.svc.cluster.local:3000/api/health/ready
+    - WHOOP:
+        icon: mdi-heart-pulse
+        href: https://grafana.thehutchery.com/d/whoop-overview/whoop-overview
+        description: Recovery, sleep, and strain.
+- Infrastructure:
+    - Grafana:
+        icon: grafana.svg
+        href: https://grafana.thehutchery.com
+        description: Dashboards, metrics, and logs.
+        namespace: monitoring
+        app: grafana
+        siteMonitor: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local/api/health
+    - Prometheus:
+        icon: prometheus.svg
+        href: https://prometheus.thehutchery.com
+        description: Metrics and alert rules.
+        namespace: monitoring
+        app: prometheus
+        siteMonitor: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/-/ready
+        widget:
+          type: prometheus
+          url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+    - Traefik:
+        icon: traefik.svg
+        href: https://traefik.thehutchery.com/dashboard/
+        description: Private routes and certificates.
+        namespace: kube-system
+        app: traefik

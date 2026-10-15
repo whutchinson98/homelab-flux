@@ -1,0 +1,21 @@
+title: The Hutchery
+description: A home for the homelab.
+base: https://home.thehutchery.com
+theme: dark
+color: slate
+headerStyle: clean
+statusStyle: dot
+target: _self
+hideVersion: true
+disableUpdateCheck: true
+useEqualHeights: true
+layout:
+  Everyday:
+    style: row
+    columns: 2
+  Infrastructure:
+    style: row
+    columns: 3
+  Shortcuts:
+    style: row
+    columns: 3

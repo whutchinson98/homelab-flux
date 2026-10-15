@@ -1,6 +1,6 @@
 # homelab-flux
 
-GitOps configuration for **forge**, a single-node k3s homelab. Flux reconciles this repository into the cluster. Monitoring and Habit Tracker are private over Tailscale. WHOOP data is collected daily into PostgreSQL and visualized in Grafana; Habit Tracker uses its own namespace and PostgreSQL instance.
+GitOps configuration for **forge**, a single-node k3s homelab. Flux reconciles this repository into the cluster. Homepage, monitoring, and Habit Tracker are private over Tailscale. WHOOP data is collected daily into PostgreSQL and visualized in Grafana; Habit Tracker uses its own namespace and PostgreSQL instance.
 
 This README describes the configuration in Git. Host installation, Tailscale enrollment, Cloudflare application DNS records, and database contents are managed outside this repository.
 
@@ -25,6 +25,7 @@ Connect to Tailscale before opening these URLs.
 
 | Service | URL |
 | --- | --- |
+| Homepage | [home.thehutchery.com](https://home.thehutchery.com) |
 | Grafana | [grafana.thehutchery.com](https://grafana.thehutchery.com) |
 | WHOOP dashboard | [WHOOP Overview](https://grafana.thehutchery.com/d/whoop-overview/whoop-overview) |
 | Habit Tracker | [habits.thehutchery.com](https://habits.thehutchery.com) |
@@ -84,6 +85,7 @@ apps/whoop-scraper/
   secrets/                        Doppler token and environment/registry sync
   app/                            Scheduled scraper workload
 apps/habit-tracker/                Private app, migration init container, image updates, secrets and certificate
+apps/homepage/                     Private dashboard, service links, cluster widgets and certificate
 scripts/                          Local setup and database helpers
 .sops.yaml                        Encryption rules and public age recipient
 ```
@@ -117,6 +119,8 @@ The root `flux-system` Kustomization applies the child Flux Kustomizations. Thei
 | `habit-tracker-certificate` | `cert-manager-issuers`, `habit-postgres` |
 | `habit-tracker` | `habit-postgres`, `habit-tracker-secrets`, `habit-tracker-certificate`, `routing-traefik` |
 | `habit-postgres-monitoring` | `habit-postgres`, `monitoring` |
+| `homepage-certificate` | `cert-manager-issuers` |
+| `homepage` | `homepage-certificate`, `routing-traefik`, `monitoring`, `habit-postgres` |
 
 Flux checks Git every **minute**. Kustomizations also reconcile every **10 minutes**, and new source revisions trigger reconciliation automatically. Manual reconcile commands accelerate that process; they are not required for every push. Helm chart versions are pinned in each `HelmRelease`.
 
@@ -124,7 +128,7 @@ Most resources are pruned when removed from Git. The database Kustomization deli
 
 ## Networking and certificates
 
-Cloudflare has manually maintained, **DNS-only** A records for `grafana`, `prometheus`, `traefik`, and `habits`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
+Cloudflare has manually maintained, **DNS-only** A records for `home`, `grafana`, `prometheus`, `traefik`, and `habits`, all pointing to `100.84.41.55`. Public DNS resolution does not make the Tailscale address publicly reachable.
 
 Traefik uses host networking on `forge` and listens for application HTTPS only on `100.84.41.55:443`. The default web/websecure listeners, LoadBalancer Service and NodePorts are disabled. Its internal health/admin entry point binds to loopback. Routes use the `tailscale` entry point and ingress class annotation.
 
@@ -257,6 +261,25 @@ flux get images all -n habit-tracker
 For a migration failure, inspect init-container logs and fix the migration before retrying; do not bypass initialization. For image update failures, inspect `flux logs --kind=ImageUpdateAutomation --name=habit-tracker --namespace=habit-tracker --level=error`. Flux needs a deploy key allowed to write to this repository and a `main` branch policy that permits its commits.
 
 To hold a particular version, set `spec.suspend: true` on the [ImageUpdateAutomation](apps/habit-tracker/images/automation.yaml), pin the desired digest, and push both changes together. For normal manual Git changes, pull before editing/pushing because Flux also commits to `main`.
+
+## Homepage
+
+[Homepage](https://home.thehutchery.com) is the private front door to the homelab. Connect to Tailscale to open it. It links to Habit Tracker, the WHOOP dashboard, Grafana, Prometheus and Traefik, with shortcuts to GitHub, Tailscale and Cloudflare. The overview shows live node CPU/memory usage, and the Prometheus card shows scrape target counts. HTTP checks use internal Services; Kubernetes status reflects pod phases, not end-to-end application health.
+
+Edit [`apps/homepage/app/config/`](apps/homepage/app/config/) to change the dashboard:
+
+- `services.yaml`: service cards, URLs, health checks and integrations.
+- `widgets.yaml`: cluster overview, greeting and Toronto clock.
+- `bookmarks.yaml`: external shortcuts.
+- `settings.yaml`: title, theme and layout.
+
+Kustomize generates a ConfigMap with a content hash, so config changes trigger a deployment rollout through Flux. The image is pinned by release and digest in the app's `kustomization.yaml`; upgrades are deliberate Git changes. All dashboard configuration is in Git, with no database or PVC. Next.js runtime files are ephemeral and logs go to stdout for Alloy/Loki.
+
+Homepage runs as UID 1000 with dropped capabilities and a read-only configuration mount. Its service account can read node capacity/metrics and pods/pod metrics only in `habit-tracker`, `monitoring` and `kube-system`. It cannot read Secrets or change cluster resources. Service discovery is disabled; adding a card from another namespace requires an explicit RoleBinding in `rbac.yaml`. Credentials are not needed for the configured widgets.
+
+Access uses the existing Tailscale-only Traefik listener and a Let's Encrypt certificate. Homepage does not add a login; tailnet access policy controls who can open it. `HOMEPAGE_ALLOWED_HOSTS` validates the hostname, not user identity. Keep this route private. The DNS-only `home` A record is maintained in Cloudflare outside Flux.
+
+Validate edits with `kubectl kustomize apps/homepage/app`, `kubectl kustomize apps/homepage/certificate`, and `kubectl kustomize clusters/forge`. After deployment, check `flux get kustomizations -n flux-system`, `kubectl -n homepage get pods,certificate`, and open the dashboard. `/api/validate` should return `[]`; `/api/widgets/kubernetes` should return live node metrics.
 
 ## Common operations
 

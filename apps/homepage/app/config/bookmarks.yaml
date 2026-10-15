@@ -1,0 +1,10 @@
+- Shortcuts:
+    - Homelab GitOps:
+        - abbr: GH
+          href: https://github.com/whutchinson98/homelab-flux
+    - Tailscale:
+        - abbr: TS
+          href: https://login.tailscale.com/admin/machines
+    - Cloudflare:
+        - abbr: CF
+          href: https://dash.cloudflare.com

@@ -1,0 +1,18 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: homepage
+  namespace: homepage
+  annotations:
+    kubernetes.io/ingress.class: tailscale
+spec:
+  entryPoints:
+    - tailscale
+  routes:
+    - match: Host(`home.thehutchery.com`)
+      kind: Rule
+      services:
+        - name: homepage
+          port: 3000
+  tls:
+    secretName: homepage-tls

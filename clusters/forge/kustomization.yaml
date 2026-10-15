@@ -14,3 +14,4 @@ resources:
   - whoop-scraper.yaml
   - whoop-grafana.yaml
   - habit-tracker.yaml
+  - homepage.yaml

@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingressroute.yaml
+  - rbac.yaml
+configMapGenerator:
+  - name: homepage-config
+    namespace: homepage
+    files:
+      - settings.yaml=config/settings.yaml
+      - services.yaml=config/services.yaml
+      - widgets.yaml=config/widgets.yaml
+      - bookmarks.yaml=config/bookmarks.yaml
+      - kubernetes.yaml=config/kubernetes.yaml
+    literals:
+      - docker.yaml={}
+      - proxmox.yaml={}
+      - custom.css=
+      - custom.js=
+images:
+  - name: ghcr.io/gethomepage/homepage
+    newTag: v2.5.0
+    digest: sha256:57c4a0531937889c0b968b120fe9c2560bbe036b5c9e18c49a9e2479de9975d1

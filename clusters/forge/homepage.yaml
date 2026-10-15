@@ -1,0 +1,36 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: homepage-certificate
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 10m
+  dependsOn:
+    - name: cert-manager-issuers
+  path: ./apps/homepage/certificate
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: homepage
+  namespace: flux-system
+spec:
+  interval: 10m
+  timeout: 5m
+  dependsOn:
+    - name: homepage-certificate
+    - name: routing-traefik
+    - name: monitoring
+    - name: habit-postgres
+  path: ./apps/homepage/app
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

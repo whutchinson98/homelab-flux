@@ -1,0 +1,19 @@
+- greeting:
+    text: The Hutchery
+    text_size: 2xl
+- kubernetes:
+    cluster:
+      show: true
+      cpu: true
+      memory: true
+      showLabel: true
+      label: forge
+    nodes:
+      show: false
+- datetime:
+    locale: en-CA
+    text_size: md
+    format:
+      dateStyle: medium
+      timeStyle: short
+      timeZone: America/Toronto
